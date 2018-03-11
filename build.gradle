@@ -1,0 +1,65 @@
+apply plugin: 'java'
+apply plugin: 'idea'
+
+import groovy.sql.Sql
+import org.h2.tools.Server
+import java.sql.Connection
+import java.sql.DriverManager
+import org.h2.Driver
+
+repositories {
+    mavenCentral()
+}
+configurations { driver }
+
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath group: 'com.h2database', name: 'h2', version:h2_version
+    }
+}
+
+dependencies{
+    driver group: 'com.h2database', name: 'h2', version: h2_version
+    compile group: 'com.h2database', name: 'h2', version: h2_version
+    compile group: 'org.springframework.boot', name: 'spring-boot-starter-web', version: spring_boot_version
+    compile group: 'org.springframework.boot', name: 'spring-boot-starter-data-jpa', version: spring_boot_version
+    compile group: 'org.springframework.boot', name: 'spring-boot-starter-mail', version: spring_boot_version
+    compile group: 'org.springframework.boot', name: 'spring-boot-starter-freemarker', version: spring_boot_version
+    //compile group: 'org.freemarker', name: 'freemarker',version:freemaker_version
+    compile group: 'org.hibernate',name: 'hibernate-core' ,version: hibernate_version
+    compile group: 'org.apache.commons', name: 'commons-lang3', version: '3.0'
+}
+
+
+
+task setupH2<<{
+    URLClassLoader loader = GroovyObject.class.classLoader as URLClassLoader
+    configurations.driver.each {
+        File file -> loader.addURL(file.toURI().toURL())
+    }
+    Class driverClass = loader.loadClass('org.h2.Driver')
+    java.sql.Driver driverInstance = driverClass.newInstance()
+    java.sql.DriverManager.registerDriver(driverInstance)
+    String sqlBaseFilePath = "$rootDir/DBScripts/H2/"
+    String bytewheelsSQL = new File(sqlBaseFilePath+'bytewheels.h2.sql').text
+    startDataBase()
+    def sqlGlobal = Sql.newInstance('jdbc:h2:tcp://localhost/mem:bytewheels;MVCC=TRUE', 'sa', '', 'org.h2.Driver')
+    sqlGlobal.execute(bytewheelsSQL)
+    sleep(1000000000)
+}
+
+private void startDataBase(){
+    Server server = null
+    try {
+        server = Server.createTcpServer("-tcpAllowOthers").start()
+        Connection conn = DriverManager.getConnection("jdbc:h2:tcp://localhost/mem:bytewheels;MVCC=TRUE", "sa", "")
+        System.out.println("Connection Established: "
+                + conn.getMetaData().getDatabaseProductName() + "/" + conn.getCatalog())
+    } catch (Exception e) {
+        e.printStackTrace()
+    }
+}
+
